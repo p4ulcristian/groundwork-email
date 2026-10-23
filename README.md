@@ -9,7 +9,7 @@ spam complaints and inbound email come back on two webhooks and are
 handed to the app's functions, by the email's tag and by the mailbox.
 
 ```clojure
-io.github.p4ulcristian/postbox {:git/tag "v0.1.1" :git/sha "83f8660"}
+io.github.p4ulcristian/postbox {:git/tag "v0.1.2" :git/sha "b407967"}
 ```
 
 Needs [backroom](https://github.com/p4ulcristian/backroom),
