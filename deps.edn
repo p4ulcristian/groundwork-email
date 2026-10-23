@@ -14,7 +14,7 @@
   ;; a reference what it does on delete, update and when checked, an index as a map;
   ;; migrate! takes {:tables :extensions :functions :views}; run-in-transaction! takes the
   ;; caller's :log
-  io.github.p4ulcristian/cellar   {:git/sha "4396e6bc9353b8eb614c0db7b839da537d11863e"}
+  io.github.p4ulcristian/cellar   {:git/sha "7e239c732113d162f2462bc217b3abb88a8bd208"}
   ;; an email kept in its background job, Postmark's JSON and the webhooks', by the app's wire
   io.github.p4ulcristian/wire     {:git/tag "v0.2.0" :git/sha "d66b7cb"}
   ;; the app's log, handed in
