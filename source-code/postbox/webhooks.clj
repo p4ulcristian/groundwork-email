@@ -38,10 +38,12 @@
       :attachments [{:name \"door.jpg\" :content-type \"image/jpeg\" :bytes bytes}]}
 
    One with no mailbox on the domain, or a mailbox with no function, is
-   written to the log at :info. Each function runs in one transaction on
-   the app's pool, as (f event {:transaction transaction :log log})."
+   written to the log at :info. Each function runs in one transaction the
+   app's :run-in-transaction makes (the app says as whom: groundwork's runs
+   it as doorman's system actor :postbox, which the gates allow what the
+   app's sentences give it), as (f event {:transaction transaction :log
+   log}); the email's key is looked up in that transaction first."
   (:require
-   [cellar.api :as cellar]
    [clojure.string :as str]
    [safe.api :as safe]
    [wire.api :as wire])
@@ -131,12 +133,12 @@
   {:status 400 :headers {"content-type" "text/plain" "cache-control" "no-store"} :body "Send a JSON object."})
 
 (defn- run-function!
-  "Runs the app's function in one transaction; :handled, or :failed
-   (written to the log)."
-  [{:keys [pool log]} f event webhook what]
+  "Runs (f (add-to-event transaction event) context) in one transaction
+   the app's :run-in-transaction makes; :handled, or :failed (written to
+   the log)."
+  [{:keys [run-in-transaction log]} f add-to-event event webhook what]
   (try
-    (cellar/run-in-transaction! pool {:read-only? false}
-                                (fn [transaction] (f event {:transaction transaction :log log})))
+    (run-in-transaction (fn [transaction] (f (add-to-event transaction event) {:transaction transaction :log log})))
     :handled
     (catch Exception e
       (log :error :postbox/webhook-function-failed (assoc what :postbox/webhook webhook :error e))
@@ -159,10 +161,9 @@
 
 (defn- answer-delivery-event [{:keys [tags on-delivery-event log find-email-key] :as webhooks} payload]
   (if-let [event (normalize-delivery-event tags payload)]
-    (let [event (assoc event :email-key (find-email-key (:message-id event)))
-          what  {:postbox/kind (:kind event) :postbox/tag (:tag event) :postbox/message-id (:message-id event)}]
+    (let [what  {:postbox/kind (:kind event) :postbox/tag (:tag event) :postbox/message-id (:message-id event)}]
       (if-let [f (get on-delivery-event (:tag event))]
-        (run-function! webhooks f event :delivery what)
+        (run-function! webhooks f #(assoc %2 :email-key (find-email-key %1 (:message-id %2))) event :delivery what)
         (do (log :info :postbox/no-function what)
             :no-function)))
     :ignored))
@@ -171,7 +172,7 @@
   (let [email (normalize-inbound-email inbound-domain payload)
         what  {:postbox/mailbox (:mailbox email) :postbox/message-id (:message-id email)}]
     (if-let [f (get on-inbound-email (:mailbox email))]
-      (run-function! webhooks f email :inbound what)
+      (run-function! webhooks f (fn [_ email] email) email :inbound what)
       (do (log :info :postbox/no-function what)
           :no-function))))
 

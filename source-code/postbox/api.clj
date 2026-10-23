@@ -89,6 +89,8 @@
                [:email/queued-at  :time/instant             {:default :now}]
                [:email/sent-at    :time/instant             {:optional? true}]]
    :indexes   [[:email/message-id]]
+   :references []
+   :triggers   []
    :gates     nil
    :on-change nil})
 
@@ -229,15 +231,18 @@
   "The provider's two webhooks as reitit data, at the settings' paths
    (postbox.webhooks says what they answer and hand on). Settings
    (webhook-settings-shape: :delivery-path :inbound-path :token, a secret
-   of safe's of at least 16 characters, :inbound-domain) and options (:pool, :on-delivery-event {tag f},
-   :on-inbound-email {mailbox f}; f is (fn [event {:keys [transaction
-   log]}]), safe to run twice), every key required, checked first; a tag
-   that isn't one of the settings' :tags is refused."
+   of safe's of at least 16 characters, :inbound-domain) and options
+   (:run-in-transaction, (fn [f]) running (f transaction) in one
+   transaction of the app's, as whom it chooses (groundwork's: doorman's
+   system actor :postbox); :on-delivery-event {tag f}; :on-inbound-email
+   {mailbox f}; f is (fn [event {:keys [transaction log]}]), safe to run
+   twice), every key required, checked first; a tag that isn't one of the
+   settings' :tags is refused."
   [{:keys [settings log meter wire]} webhook-settings options]
   (settings/check-data-for-shape "The settings" :postbox/bad-settings settings/webhook-settings-shape webhook-settings)
   (settings/check-token-length (:token webhook-settings))
   (settings/check-data-for-shape "The options" :postbox/bad-options settings/webhook-options-shape options)
-  (let [{:keys [pool on-delivery-event on-inbound-email]} options
+  (let [{:keys [run-in-transaction on-delivery-event on-inbound-email]} options
         strangers (remove (:tags settings) (keys on-delivery-event))]
     (when (seq strangers)
       (throw (ex-info (str "The delivery functions name tags the settings' :tags don't have: " (pr-str (vec strangers)))
@@ -247,8 +252,8 @@
             :tags              (:tags settings)
             :wire              wire
             :log               log
-            :pool              pool
+            :run-in-transaction run-in-transaction
             :on-delivery-event on-delivery-event
             :on-inbound-email  on-inbound-email
-            :find-email-key    #(when % (:email/key (cellar/find-one-row pool find-email-of-message {:email/message-id %})))
+            :find-email-key    #(when %2 (:email/key (cellar/find-one-row %1 find-email-of-message {:email/message-id %2})))
             :count-event!      #(metrics/count-webhook-event! meter %1 %2)))))

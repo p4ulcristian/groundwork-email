@@ -70,7 +70,7 @@ namespace, `postbox.api`.
                               :inbound-path   "/postbox/inbound"
                               :token          webhook-token        ; safe's secret, #secret :postbox/webhook-token, 16 characters or more
                               :inbound-domain "in.shop.example"}
-                             {:pool              pool
+                             {:run-in-transaction #(cellar/run-in-transaction! pool {:read-only? false} %)   ; the app's, as whom it chooses
                               :on-delivery-event {:orders/confirmation mark-address-undeliverable!}   ; (fn [event {:keys [transaction log]}])
                               :on-inbound-email  {"quotes" add-quote-request!}})
 ```
@@ -98,7 +98,11 @@ function of its email's tag, `{:kind :tag :message-id :email-key :address
 :bounce-type :inactive? :metadata}`; an inbound email to the function of
 its mailbox (before `@` on `:inbound-domain`), `{:message-id :mailbox :from
 :to :subject :text :html :stripped-reply :attachments}`. Each runs in one
-transaction. **A function must be safe to run twice:** the provider may
+transaction the app's `:run-in-transaction` makes: the app says as whom
+it runs, so rows behind its gates are reached only as someone they allow
+(groundwork runs it as doorman's system actor `:postbox`;
+[why](decisions/2026-10-23-the-app-makes-the-webhooks-transaction.md)).
+**A function must be safe to run twice:** the provider may
 post an event again
 ([why](decisions/2026-10-23-webhooks-hand-events-to-the-apps-functions.md)).
 The server's body limit must take an inbound email with its attachments.

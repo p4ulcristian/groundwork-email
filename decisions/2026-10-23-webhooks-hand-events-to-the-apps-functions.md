@@ -1,5 +1,7 @@
 # The webhooks hand events to the app's functions; always 200
 
+> **Changed in part** by [The app makes the transaction a webhook's function runs in](2026-10-23-the-app-makes-the-webhooks-transaction.md) (2026-10-23): the functions run in a transaction the app's `:run-in-transaction` makes, not one postbox opens on its pool.
+
 > **Changed in part** by [The family and its composer are groundwork](https://github.com/p4ulcristian/groundwork/blob/Starting-from-the-bottom/decisions/2026-10-23-the-family-and-its-composer-are-groundwork.md) (2026-10-23): manor, the family, and house, the composer, are both named groundwork now.
 
 **Decision:** `make-webhook-routes` makes two POST routes as reitit data, at the settings' `:delivery-path` and `:inbound-path`; the provider's webhook URL carries `?token=<the settings' :token>`.

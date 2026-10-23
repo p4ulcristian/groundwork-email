@@ -101,15 +101,19 @@
                                   (catch Exception e e))))))
     (is (= :postbox/bad-options
            (:type (ex-data (try (postbox/make-webhook-routes box webhook-settings
-                                                             {:pool :none :on-delivery-event {:orders/unknown (fn [_ _])}
+                                                             {:run-in-transaction (fn [_]) :on-delivery-event {:orders/unknown (fn [_ _])}
                                                               :on-inbound-email {}})
                                 (catch Exception e e)))))
-        "a delivery function for a tag the settings don't have")))
+        "a delivery function for a tag the settings don't have")
+    (is (= {:run-in-transaction ["missing required key"] :pool ["disallowed key"]}
+           (:errors (ex-data (try (postbox/make-webhook-routes box webhook-settings {:pool :a-pool :on-delivery-event {} :on-inbound-email {}})
+                                  (catch Exception e e)))))
+        "the app hands the transaction it runs them in, not a pool")))
 
 (deftest the-tokens-are-secrets
   (let [refusal (fn [f] (try (f) :nothing (catch clojure.lang.ExceptionInfo e (select-keys (ex-data e) [:type :errors]))))
         box     (postbox/make-postbox (make-settings log-provider) {:log log :meter (make-meter) :wire wire})
-        options {:pool :not-reached :on-delivery-event {} :on-inbound-email {}}]
+        options {:run-in-transaction (fn [_] (throw (ex-info "not reached" {}))) :on-delivery-event {} :on-inbound-email {}}]
     (testing "Postmark's server token written out as text is refused, and the text is never said"
       (let [refused (refusal #(postbox/make-postbox (make-settings {:name :postmark :server-token "written-out-server-token"
                                                                     :api-url "https://api.postmarkapp.com"
@@ -133,7 +137,7 @@
         box    (postbox/make-postbox (make-settings log-provider) {:log log :meter m :wire wire})
         called (atom 0)
         routes (postbox/make-webhook-routes box webhook-settings
-                                            {:pool              :not-reached
+                                            {:run-in-transaction (fn [_] (throw (ex-info "not reached" {})))
                                              :on-delivery-event {:orders/confirmation (fn [_ _] (swap! called inc))}
                                              :on-inbound-email  {"quotes" (fn [_ _] (swap! called inc))}})
         bounce "{\"RecordType\":\"Bounce\",\"Tag\":\"orders/confirmation\",\"MessageID\":\"m-1\"}"]
@@ -289,8 +293,11 @@
 
               (testing "a bounce is handed to its tag's function, with postbox's key and the metadata"
                 (let [events  (atom [])
+                      runs    (atom 0)
                       routes  (postbox/make-webhook-routes box webhook-settings
-                                                           {:pool              pool
+                                                           {:run-in-transaction (fn [f]
+                                                                                  (swap! runs inc)
+                                                                                  (cellar/run-in-transaction! pool {:read-only? false} f))
                                                             :on-delivery-event {:orders/confirmation (fn [event {:keys [transaction]}]
                                                                                                        (is (some? transaction))
                                                                                                        (swap! events conj event))
@@ -301,6 +308,7 @@
                                                            "MessageID" "pm-3" "Email" "anna@shop.example" "Inactive" true
                                                            "Metadata" {"order-id" "3"}})]
                   (is (= 200 (:status (post routes "/postbox/delivery" token bounce))))
+                  (is (= 1 @runs) "in the transaction the app's function made, postbox's key looked up in it too")
                   (is (= [{:kind :bounce :tag :orders/confirmation :message-id "pm-3" :email-key "order-confirmation/3"
                            :address "anna@shop.example" :bounce-type "HardBounce" :inactive? true :metadata {"order-id" "3"}}]
                          @events))

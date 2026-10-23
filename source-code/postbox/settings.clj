@@ -109,7 +109,11 @@
 
 (def webhook-options-shape
   "make-webhook-routes' options, every key required.
-   :pool: the app's pool; each event is handled in one transaction on it.
+   :run-in-transaction: (fn [f]), running (f transaction) in one
+   transaction of the app's and returning what f returns; each event is
+   handled in one. The app says as whom it runs: rows behind the app's
+   gates are reached only as someone they allow (groundwork's runs it as
+   doorman's system actor :postbox).
    :on-delivery-event: {tag (fn [event context])}, a bounce or spam
    complaint handed to the function of the email's tag; {} for none.
    :on-inbound-email: {mailbox (fn [email context])}, an inbound email
@@ -117,7 +121,7 @@
    context is {:transaction :log}. A function must be safe to run twice:
    the provider may post an event again."
   [:map {:closed true}
-   [:pool some?]
+   [:run-in-transaction fn?]
    [:on-delivery-event [:map-of :qualified-keyword fn?]]
    [:on-inbound-email [:map-of [:string {:min 1}] fn?]]])
 
