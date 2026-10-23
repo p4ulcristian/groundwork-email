@@ -5,7 +5,8 @@
      POST <delivery-path>?token=…   a bounce or a spam complaint on an email the app sent
      POST <inbound-path>?token=…    an email sent to the app
 
-   The token is compared in constant time (both sides hashed first); none
+   The token, a secret of safe's, is compared in constant time
+   (safe/equal?: both sides hashed first); none
    or another is 401, written to the log at :warn, and nothing is read. A
    body that isn't a JSON object is 400. Otherwise the post is answered
    200, whatever the app's function does: one that throws is written to
@@ -42,15 +43,12 @@
   (:require
    [cellar.api :as cellar]
    [clojure.string :as str]
+   [safe.api :as safe]
    [wire.api :as wire])
   (:import
    (java.net URLDecoder)
    (java.nio.charset StandardCharsets)
-   (java.security MessageDigest)
    (java.util Base64)))
-
-(defn- hash-text ^bytes [^String text]
-  (.digest (MessageDigest/getInstance "SHA-256") (.getBytes text StandardCharsets/UTF_8)))
 
 (defn- read-token [{:keys [query-string]}]
   (some-> (when query-string (re-find #"(?:^|&)token=([^&]*)" query-string))
@@ -58,11 +56,10 @@
           (URLDecoder/decode StandardCharsets/UTF_8)))
 
 (defn has-token?
-  "Whether the request's ?token= is the token, compared in constant time."
+  "Whether the request's ?token= is the token (a secret), compared in
+   constant time by safe."
   [request token]
-  (let [given (read-token request)]
-    (and (string? given)
-         (MessageDigest/isEqual (hash-text given) (hash-text token)))))
+  (safe/equal? token (read-token request)))
 
 (defn- read-body [wire {:keys [body]}]
   (try

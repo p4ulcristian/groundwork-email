@@ -17,7 +17,8 @@ Needs [backroom](https://github.com/p4ulcristian/backroom),
 [wire](https://github.com/p4ulcristian/wire),
 [logbook](https://github.com/p4ulcristian/logbook) and
 [meter](https://github.com/p4ulcristian/meter) (the last three handed in),
-and malli; Postmark is called with the JDK's own HTTP client. One public
+[safe](https://github.com/p4ulcristian/safe) (the two tokens are its
+secrets) and malli; Postmark is called with the JDK's own HTTP client. One public
 namespace, `postbox.api`.
 
 ## The api
@@ -36,7 +37,7 @@ namespace, `postbox.api`.
 
 (def postbox
   (postbox/make-postbox {:provider       {:name               :postmark
-                                          :server-token       postmark-token
+                                          :server-token       postmark-token   ; safe's secret, #secret :postbox/postmark-token
                                           :api-url            "https://api.postmarkapp.com"
                                           :connect-timeout-ms 10000
                                           :request-timeout-ms 30000}
@@ -67,7 +68,7 @@ namespace, `postbox.api`.
 (postbox/make-webhook-routes postbox
                              {:delivery-path  "/postbox/delivery"
                               :inbound-path   "/postbox/inbound"
-                              :token          webhook-token
+                              :token          webhook-token        ; safe's secret, #secret :postbox/webhook-token, 16 characters or more
                               :inbound-domain "in.shop.example"}
                              {:pool              pool
                               :on-delivery-event {:orders/confirmation mark-address-undeliverable!}   ; (fn [event {:keys [transaction log]}])
@@ -86,7 +87,10 @@ Postmark: 200 is sent; 422 of an invalid email (300) or an inactive
 recipient (406) gives up at once; anything else runs again by backroom's
 retries ([why](decisions/2026-10-23-the-provider-is-a-setting.md)).
 
-The webhooks: the token is compared in constant time, 401 without it; a
+The two tokens are safe's secrets: written out as text, they are refused,
+and each is revealed only where it is used, Postmark's in its header, the
+webhooks' once for its length. The webhooks: the token is compared in
+constant time (`safe/equal?`), 401 without it; a
 body that isn't a JSON object is 400; every other post is 200, whatever the
 app's function does (one that throws is logged,
 `:postbox/webhook-function-failed`). A bounce or spam complaint goes to the

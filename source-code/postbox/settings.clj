@@ -6,7 +6,8 @@
    itself: values the app hands in, not data crossing an edge."
   (:require
    [malli.core :as malli]
-   [malli.error :as malli-error]))
+   [malli.error :as malli-error]
+   [safe.api :as safe]))
 
 (def ^:private address-shape
   [:re {:error/message "should be an address starting with http:// or https://, no / at the end"} #"^https?://.*[^/]$"])
@@ -14,7 +15,8 @@
 (def provider-shape
   "Who sends, by :name; each provider its own keys, every one required.
    {:name :postmark ...}: Postmark's HTTP API. :server-token, the server's
-   API token, a secret; :api-url, \"https://api.postmarkapp.com\";
+   API token, a secret of safe's (#secret :postbox/postmark-token in the
+   app's settings file; text written out is refused); :api-url, \"https://api.postmarkapp.com\";
    :connect-timeout-ms, how long a send waits for the connection;
    :request-timeout-ms, how long it waits for Postmark's answer after.
    {:name :log :level :info}: nothing is sent; each email is written to
@@ -23,7 +25,7 @@
   [:multi {:dispatch :name}
    [:postmark [:map {:closed true}
                [:name [:= :postmark]]
-               [:server-token [:string {:min 1}]]
+               [:server-token safe/secret]
                [:api-url address-shape]
                [:connect-timeout-ms [:int {:min 1}]]
                [:request-timeout-ms [:int {:min 1}]]]]
@@ -93,14 +95,16 @@
    :delivery-path: where the provider posts bounces and spam complaints,
    \"/postbox/delivery\".
    :inbound-path: where it posts email sent to the app, \"/postbox/inbound\".
-   :token: the secret both URLs carry as ?token=…; the provider's webhook
-   URL is <app>/<path>?token=<token>.
+   :token: the secret both URLs carry as ?token=…, a secret of safe's
+   (#secret :postbox/webhook-token; text written out is refused), at least
+   16 characters (make-webhook-routes checks); the provider's webhook URL
+   is <app>/<path>?token=<token>.
    :inbound-domain: the domain the app takes email on, \"in.shop.example\":
    an inbound email's mailbox is the part before @ of its recipient there."
   [:map {:closed true}
    [:delivery-path [:re #"^/"]]
    [:inbound-path [:re #"^/"]]
-   [:token [:string {:min 16}]]
+   [:token safe/secret]
    [:inbound-domain [:string {:min 1}]]])
 
 (def webhook-options-shape
@@ -116,6 +120,18 @@
    [:pool some?]
    [:on-delivery-event [:map-of :qualified-keyword fn?]]
    [:on-inbound-email [:map-of [:string {:min 1}] fn?]]])
+
+(def ^:private shortest-token-length 16)
+
+(defn check-token-length
+  "Throws {:type :postbox/bad-settings :errors {:token […]}} when the
+   webhooks' token is shorter than 16 characters: a URL's token is
+   guessed by trying. The text is revealed here, for its length only, and
+   never said."
+  [token]
+  (when (< (count (safe/reveal token)) shortest-token-length)
+    (throw (ex-info (str "The settings have problems: :token should be at least " shortest-token-length " characters")
+                    {:type :postbox/bad-settings :errors {:token [(str "should be at least " shortest-token-length " characters")]}}))))
 
 (defn check-data-for-shape
   "Returns the data; throws {:type kind :errors …} with every problem at

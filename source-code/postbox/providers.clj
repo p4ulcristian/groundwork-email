@@ -10,6 +10,7 @@
   (:require
    [backroom.api :as backroom]
    [clojure.string :as str]
+   [safe.api :as safe]
    [wire.api :as wire])
   (:import
    (java.net URI)
@@ -49,7 +50,7 @@
                     (.timeout (Duration/ofMillis request-timeout-ms))
                     (.header "Accept" "application/json")
                     (.header "Content-Type" "application/json")
-                    (.header "X-Postmark-Server-Token" server-token)
+                    (.header "X-Postmark-Server-Token" (safe/reveal server-token))
                     (.POST (HttpRequest$BodyPublishers/ofString (wire/turn-data-into-json-text wire body)))
                     (.build))
         answer  (.send client request (HttpResponse$BodyHandlers/ofString))]

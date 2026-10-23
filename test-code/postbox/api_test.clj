@@ -14,6 +14,7 @@
    [logbook.api :as logbook]
    [meter.api :as meter]
    [postbox.api :as postbox]
+   [safe.api :as safe]
    [wire.api :as wire])
   (:import
    (com.sun.net.httpserver HttpExchange HttpHandler HttpServer)
@@ -52,7 +53,7 @@
 
 (def ^:private webhook-settings
   {:delivery-path "/postbox/delivery" :inbound-path "/postbox/inbound"
-   :token "the-webhook-token-0123" :inbound-domain "in.shop.example"})
+   :token (safe/make-secret :postbox/webhook-token "the-webhook-token-0123") :inbound-domain "in.shop.example"})
 
 (defn- make-email [order-id]
   {:key         (str "order-confirmation/" order-id)
@@ -104,6 +105,28 @@
                                                               :on-inbound-email {}})
                                 (catch Exception e e)))))
         "a delivery function for a tag the settings don't have")))
+
+(deftest the-tokens-are-secrets
+  (let [refusal (fn [f] (try (f) :nothing (catch clojure.lang.ExceptionInfo e (select-keys (ex-data e) [:type :errors]))))
+        box     (postbox/make-postbox (make-settings log-provider) {:log log :meter (make-meter) :wire wire})
+        options {:pool :not-reached :on-delivery-event {} :on-inbound-email {}}]
+    (testing "Postmark's server token written out as text is refused, and the text is never said"
+      (let [refused (refusal #(postbox/make-postbox (make-settings {:name :postmark :server-token "written-out-server-token"
+                                                                    :api-url "https://api.postmarkapp.com"
+                                                                    :connect-timeout-ms 2000 :request-timeout-ms 5000})
+                                                    {:log log :meter (make-meter) :wire wire}))]
+        (is (= {:type :postbox/bad-settings :errors {:provider {:server-token ["should be a #secret, read from the settings' secrets source"]}}}
+               refused))
+        (is (not (str/includes? (pr-str refused) "written-out-server-token")))))
+    (testing "so is the webhooks' token"
+      (is (= {:type :postbox/bad-settings :errors {:token ["should be a #secret, read from the settings' secrets source"]}}
+             (refusal #(postbox/make-webhook-routes box (assoc webhook-settings :token "the-webhook-token-0123") options)))))
+    (testing "a webhooks' token shorter than 16 characters is refused, named, its text never said"
+      (let [refused (refusal #(postbox/make-webhook-routes box (assoc webhook-settings :token (safe/make-secret :postbox/webhook-token "short-token-15c")) options))]
+        (is (= {:type :postbox/bad-settings :errors {:token ["should be at least 16 characters"]}} refused))
+        (is (not (str/includes? (pr-str refused) "short-token-15c")))))
+    (testing "16 characters are enough"
+      (is (vector? (postbox/make-webhook-routes box (assoc webhook-settings :token (safe/make-secret :postbox/webhook-token "sixteen-chars-16")) options))))))
 
 (deftest the-webhooks-refuse-without-their-token
   (let [m      (make-meter)
@@ -195,7 +218,7 @@
     {:server server :received received :url (str "http://127.0.0.1:" (.getPort (.getAddress server)))}))
 
 (defn- postmark-provider [url]
-  {:name :postmark :server-token "the-server-token" :api-url url :connect-timeout-ms 2000 :request-timeout-ms 5000})
+  {:name :postmark :server-token (safe/make-secret :postbox/postmark-token "the-server-token") :api-url url :connect-timeout-ms 2000 :request-timeout-ms 5000})
 
 (deftest emails-against-postgres
   (if-not port

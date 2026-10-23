@@ -15,6 +15,8 @@
   io.github.p4ulcristian/logbook  {:git/tag "v0.1.1" :git/sha "51a2c93"}
   ;; the app's meter, handed in: emails queued, sent and failed by tag, webhook events
   io.github.p4ulcristian/meter    {:git/tag "v0.1.2" :git/sha "a0a977b"}
+  ;; Postmark's server token and the webhooks' token, secrets that print as their names
+  io.github.p4ulcristian/safe     {:git/tag "v0.1.0" :git/sha "b4783eb"}
   ;; the settings, options and emails, checked before anything is queued
   metosin/malli                  {:mvn/version "0.20.3"}}
 

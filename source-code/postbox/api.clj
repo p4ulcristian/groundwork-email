@@ -228,13 +228,14 @@
 (defn make-webhook-routes
   "The provider's two webhooks as reitit data, at the settings' paths
    (postbox.webhooks says what they answer and hand on). Settings
-   (webhook-settings-shape: :delivery-path :inbound-path :token
-   :inbound-domain) and options (:pool, :on-delivery-event {tag f},
+   (webhook-settings-shape: :delivery-path :inbound-path :token, a secret
+   of safe's of at least 16 characters, :inbound-domain) and options (:pool, :on-delivery-event {tag f},
    :on-inbound-email {mailbox f}; f is (fn [event {:keys [transaction
    log]}]), safe to run twice), every key required, checked first; a tag
    that isn't one of the settings' :tags is refused."
   [{:keys [settings log meter wire]} webhook-settings options]
   (settings/check-data-for-shape "The settings" :postbox/bad-settings settings/webhook-settings-shape webhook-settings)
+  (settings/check-token-length (:token webhook-settings))
   (settings/check-data-for-shape "The options" :postbox/bad-options settings/webhook-options-shape options)
   (let [{:keys [pool on-delivery-event on-inbound-email]} options
         strangers (remove (:tags settings) (keys on-delivery-event))]
