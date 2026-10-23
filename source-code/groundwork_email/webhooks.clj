@@ -1,12 +1,12 @@
-(ns postbox.webhooks
+(ns groundwork-email.webhooks
   "The two routes the provider posts to (Postmark's webhooks), as reitit
    data:
 
      POST <delivery-path>?token=…   a bounce or a spam complaint on an email the app sent
      POST <inbound-path>?token=…    an email sent to the app
 
-   The token, a secret of safe's, is compared in constant time
-   (safe/equal?: both sides hashed first); none
+   The token, a secret of groundwork-settings's, is compared in constant time
+   (settings/equal?: both sides hashed first); none
    or another is 401, written to the log at :warn, and nothing is read. A
    body that isn't a JSON object is 400. Otherwise the post is answered
    200, whatever the app's function does: one that throws is written to
@@ -20,7 +20,7 @@
      {:kind        :bounce or :spam-complaint
       :tag         :orders/confirmation     ; the settings' tag the email was sent with; nil for another
       :message-id  \"…\"                       ; the provider's
-      :email-key   \"order-confirmation/…\"   ; postbox's key of the email, nil when postbox didn't send it
+      :email-key   \"order-confirmation/…\"   ; groundwork-email's key of the email, nil when groundwork-email didn't send it
       :address     \"anna@shop.example\"      ; the address that bounced or complained
       :bounce-type \"HardBounce\"             ; Postmark's Type, nil for a complaint
       :inactive?   true                     ; the provider sends no more to the address
@@ -40,13 +40,13 @@
    One with no mailbox on the domain, or a mailbox with no function, is
    written to the log at :info. Each function runs in one transaction the
    app's :run-in-transaction makes (the app says as whom: groundwork's runs
-   it as doorman's system actor :postbox, which the gates allow what the
+   it as groundwork-access's system actor :email, which the gates allow what the
    app's sentences give it), as (f event {:transaction transaction :log
    log}); the email's key is looked up in that transaction first."
   (:require
    [clojure.string :as str]
-   [safe.api :as safe]
-   [wire.api :as wire])
+   [groundwork-settings.api :as settings]
+   [groundwork-shaped-json.api :as shaped-json])
   (:import
    (java.net URLDecoder)
    (java.nio.charset StandardCharsets)
@@ -59,13 +59,13 @@
 
 (defn has-token?
   "Whether the request's ?token= is the token (a secret), compared in
-   constant time by safe."
+   constant time by groundwork-settings."
   [request token]
-  (safe/equal? token (read-token request)))
+  (settings/equal? token (read-token request)))
 
-(defn- read-body [wire {:keys [body]}]
+(defn- read-body [shaper {:keys [body]}]
   (try
-    (let [data (wire/turn-json-text-into-data wire (if (string? body) body (slurp body :encoding "UTF-8")))]
+    (let [data (shaped-json/turn-json-text-into-data shaper (if (string? body) body (slurp body :encoding "UTF-8")))]
       (when (map? data) data))
     (catch Exception _ nil)))
 
@@ -73,7 +73,7 @@
   (when (and (string? text) (not (str/blank? text))) text))
 
 (defn- turn-metadata-into-text-map
-  "The JSON's metadata, its names read as keywords by the wire, back as text."
+  "The JSON's metadata, its names read as keywords by the shaper, back as text."
   [metadata]
   (into {} (map (fn [[k v]] [(if (keyword? k) (subs (str k) 1) (str k)) (str v)])) metadata))
 
@@ -141,16 +141,16 @@
     (run-in-transaction (fn [transaction] (f (add-to-event transaction event) {:transaction transaction :log log})))
     :handled
     (catch Exception e
-      (log :error :postbox/webhook-function-failed (assoc what :postbox/webhook webhook :error e))
+      (log :error :groundwork-email/webhook-function-failed (assoc what :groundwork-email/webhook webhook :error e))
       :failed)))
 
 (defn- handle-post
   "The post's checks, then (answer-payload payload) → outcome; counted."
-  [{:keys [wire log token count-event!]} webhook request answer-payload]
+  [{:keys [shaper log token count-event!]} webhook request answer-payload]
   (let [outcome (if-not (has-token? request token)
-                  (do (log :warn :postbox/webhook-refused {:postbox/webhook webhook})
+                  (do (log :warn :groundwork-email/webhook-refused {:groundwork-email/webhook webhook})
                       :refused)
-                  (if-let [payload (read-body wire request)]
+                  (if-let [payload (read-body shaper request)]
                     (answer-payload payload)
                     :bad-body))]
     (count-event! webhook outcome)
@@ -161,19 +161,19 @@
 
 (defn- answer-delivery-event [{:keys [tags on-delivery-event log find-email-key] :as webhooks} payload]
   (if-let [event (normalize-delivery-event tags payload)]
-    (let [what  {:postbox/kind (:kind event) :postbox/tag (:tag event) :postbox/message-id (:message-id event)}]
+    (let [what  {:groundwork-email/kind (:kind event) :groundwork-email/tag (:tag event) :groundwork-email/message-id (:message-id event)}]
       (if-let [f (get on-delivery-event (:tag event))]
         (run-function! webhooks f #(assoc %2 :email-key (find-email-key %1 (:message-id %2))) event :delivery what)
-        (do (log :info :postbox/no-function what)
+        (do (log :info :groundwork-email/no-function what)
             :no-function)))
     :ignored))
 
 (defn- answer-inbound-email [{:keys [inbound-domain on-inbound-email log] :as webhooks} payload]
   (let [email (normalize-inbound-email inbound-domain payload)
-        what  {:postbox/mailbox (:mailbox email) :postbox/message-id (:message-id email)}]
+        what  {:groundwork-email/mailbox (:mailbox email) :groundwork-email/message-id (:message-id email)}]
     (if-let [f (get on-inbound-email (:mailbox email))]
       (run-function! webhooks f (fn [_ email] email) email :inbound what)
-      (do (log :info :postbox/no-function what)
+      (do (log :info :groundwork-email/no-function what)
           :no-function))))
 
 (defn make-webhook-routes

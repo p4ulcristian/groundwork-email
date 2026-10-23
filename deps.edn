@@ -1,33 +1,33 @@
-;; postbox: groundwork's email. An email the app has written is queued in the
-;; caller's transaction as a background job (backroom), sent by a provider
+;; groundwork-email: groundwork's email. An email the app has written is queued in the
+;; caller's transaction as a background job (groundwork-background-jobs), sent by a provider
 ;; (Postmark, or the log), once; bounces, spam complaints and inbound email
-;; come back on two webhooks. One tree: source-code/postbox/.
+;; come back on two webhooks. One tree: source-code/groundwork_email/.
 {:paths ["source-code"]
 
  :deps
  {;; the sending: a background job, queued in the caller's transaction
   ;; on its tidy-up branch, not released: a job kind names its system actor; its tables
-  ;; in cellar's tidy-up shapes; a job's transaction carries its log
-  io.github.p4ulcristian/backroom {:git/tag "v0.5.6" :git/sha "43acc7c"}
-  ;; the emails table, a map for cellar, and its queries
+  ;; in groundwork-postgres's tidy-up shapes; a job's transaction carries its log
+  io.github.p4ulcristian/groundwork-background-jobs {:git/tag "v0.5.6" :git/sha "43acc7c"}
+  ;; the emails table, a map for groundwork-postgres, and its queries
   ;; on its tidy-up branch, not released: a table map writes out :uniques and :checks,
   ;; a reference what it does on delete, update and when checked, an index as a map;
   ;; migrate! takes {:tables :extensions :functions :views}; run-in-transaction! takes the
   ;; caller's :log
-  io.github.p4ulcristian/cellar   {:git/tag "v0.4.6" :git/sha "4396e6b"}
-  ;; an email kept in its background job, Postmark's JSON and the webhooks', by the app's wire
-  io.github.p4ulcristian/wire     {:git/tag "v0.2.1" :git/sha "900a84d"}
+  io.github.p4ulcristian/groundwork-postgres   {:git/tag "v0.4.6" :git/sha "4396e6b"}
+  ;; an email kept in its background job, Postmark's JSON and the webhooks', by the app's shaper
+  io.github.p4ulcristian/groundwork-shaped-json     {:git/tag "v0.2.1" :git/sha "900a84d"}
   ;; the app's log, handed in
-  io.github.p4ulcristian/logbook  {:git/tag "v0.1.2" :git/sha "823f8fc"}
+  io.github.p4ulcristian/groundwork-logs  {:git/tag "v0.1.2" :git/sha "823f8fc"}
   ;; the app's meter, handed in: emails queued, sent and failed by tag, webhook events
-  io.github.p4ulcristian/meter    {:git/tag "v0.1.4" :git/sha "bf81c46"}
+  io.github.p4ulcristian/groundwork-metrics    {:git/tag "v0.1.4" :git/sha "bf81c46"}
   ;; Postmark's server token and the webhooks' token, secrets that print as their names
-  io.github.p4ulcristian/safe     {:git/tag "v0.1.1" :git/sha "72d0dbb"}
+  io.github.p4ulcristian/groundwork-settings     {:git/tag "v0.1.1" :git/sha "72d0dbb"}
   ;; the settings, options and emails, checked before anything is queued
   metosin/malli                  {:mvn/version "0.20.3"}}
 
  :aliases
- {;; the tests:  clojure -X:test  (the Postgres ones need POSTBOX_TEST_PORT, see README.md)
+ {;; the tests:  clojure -X:test  (the Postgres ones need EMAIL_TEST_PORT, see README.md)
   :test {:extra-paths ["test-code"]
          :extra-deps  {io.github.cognitect-labs/test-runner {:git/tag "v0.5.1" :git/sha "dfb30dd"}}
          :exec-fn     cognitect.test-runner.api/test

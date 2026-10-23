@@ -1,6 +1,6 @@
 -- The email its background job sends, held until the job's transaction ends: a second run of
 -- the same job waits, then sees it sent.
 SELECT email__key, email__tag, email__state, email__message_id
-FROM postbox.emails
+FROM groundwork_email.emails
 WHERE email__key = :email/key
 FOR UPDATE
