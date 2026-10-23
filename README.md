@@ -9,7 +9,7 @@ spam complaints and inbound email come back on two webhooks and are
 handed to the app's functions, by the email's tag and by the mailbox.
 
 ```clojure
-io.github.p4ulcristian/groundwork-email {:git/tag "v0.1.4" :git/sha "4a12d5b"}
+io.github.p4ulcristian/groundwork-email {:git/tag "v0.1.5" :git/sha "a1d09a8"}
 ```
 
 Needs [groundwork-background-jobs](https://github.com/p4ulcristian/groundwork-background-jobs),
