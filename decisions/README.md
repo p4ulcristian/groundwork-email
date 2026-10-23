@@ -2,7 +2,7 @@
 
 One file per decision: `YYYY-MM-DD-what-we-decided.md`. The title is the decision. Each file says what we decided, why, and what we chose against. A decision changes by a new file; the old one says so at the top (`Replaced by` or `Changed in part by`), and nothing else in it is rewritten.
 
-postbox is manor's email (manor: house and the libraries it puts together). All were decided as v0.1.0 was built, from Iron Rainbow's email code and what it taught.
+postbox is groundwork's email (groundwork: the libraries and the composer of the same name that puts them together). All were decided as v0.1.0 was built, from Iron Rainbow's email code and what it taught.
 
 - [postbox is its own library](2026-10-23-postbox-is-its-own-library.md)
 - [Sending is a background job, queued in the caller's transaction; a key is queued once](2026-10-23-sending-is-a-background-job-queued-in-the-callers-transaction.md)

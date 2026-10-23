@@ -1,5 +1,7 @@
 # Every value that sets behaviour is a setting; no hidden defaults
 
+> **Changed in part** by [The family and its composer are groundwork](https://github.com/p4ulcristian/groundwork/blob/Starting-from-the-bottom/decisions/2026-10-23-the-family-and-its-composer-are-groundwork.md) (2026-10-23): manor, the family, and house, the composer, are both named groundwork now.
+
 **Decision:** as in every manor library, every value that sets how postbox behaves is written out by the app, checked by malli before anything is queued or served, the maps closed, a missing or unknown key refused, named, with every other problem at once; no function fills in an argument.
 
 - **`make-postbox`'s settings**, `settings-shape`: `:provider` (each provider's keys), `:tags`, `:background-job {:timeout-ms :attempts}` (`:postbox/bad-settings`); its options `{:log :meter :wire}` (`:postbox/bad-options`).

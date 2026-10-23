@@ -1,4 +1,4 @@
-;; postbox: manor's email. An email the app has written is queued in the
+;; postbox: groundwork's email. An email the app has written is queued in the
 ;; caller's transaction as a background job (backroom), sent by a provider
 ;; (Postmark, or the log), once; bounces, spam complaints and inbound email
 ;; come back on two webhooks. One tree: source-code/postbox/.

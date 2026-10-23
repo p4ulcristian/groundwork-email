@@ -1,5 +1,7 @@
 # postbox is its own library
 
+> **Changed in part** by [The family and its composer are groundwork](https://github.com/p4ulcristian/groundwork/blob/Starting-from-the-bottom/decisions/2026-10-23-the-family-and-its-composer-are-groundwork.md) (2026-10-23): manor, the family, and house, the composer, are both named groundwork now.
+
 **Decision:** email is manor's library postbox: an email the app has written is queued in the caller's transaction as a background job (backroom), sent once by a provider (Postmark, or the log), its envelope kept in a table of postbox's; bounces, spam complaints and inbound email come back on two webhooks, handed to the app's functions. It is its own repository, `io.github.p4ulcristian/postbox`, public, MIT, topic `manor`; house takes it from git and puts its settings, table, background job kind and webhook routes in. One public namespace, `postbox.api`. It needs backroom, cellar, wire, logbook and meter, and malli. Since v0.1.0.
 
 It is Iron Rainbow's email code made general: its Postmark client and log-only mode, its delivery and inbound webhooks, and its order emails sent as jobs in the order's transaction. Nothing of Iron Rainbow's is in it: no template, address, domain or token.
