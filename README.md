@@ -73,7 +73,7 @@ namespace, `postbox.api`.
                               :inbound-path   "/postbox/inbound"
                               :token          webhook-token        ; safe's secret, #secret :postbox/webhook-token, 16 characters or more
                               :inbound-domain "in.shop.example"}
-                             {:run-in-transaction #(cellar/run-in-transaction! pool {:read-only? false} %)   ; the app's, as whom it chooses
+                             {:run-in-transaction #(cellar/run-in-transaction! pool {:read-only? false :log log} %)   ; the app's, as whom it chooses
                               :on-delivery-event {:orders/confirmation mark-address-undeliverable!}   ; (fn [event {:keys [transaction log]}])
                               :on-inbound-email  {"quotes" add-quote-request!}})
 ```

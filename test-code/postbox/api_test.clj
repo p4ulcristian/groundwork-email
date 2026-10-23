@@ -182,7 +182,7 @@
 (defn- start-workers! [pool box m]
   (backroom/start-workers! pool {:wire wire :log log :meter m
                                  ;; as an app opens the job's transaction (doorman's run-as-system!, in groundwork)
-                                 :run-in-transaction-as (fn [pool _system-actor f] (cellar/run-in-transaction! pool {:read-only? false} f))
+                                 :run-in-transaction-as (fn [pool _system-actor log f] (cellar/run-in-transaction! pool {:read-only? false :log log} f))
                                  :kinds [(postbox/make-background-job-kind box)] :schedules []
                                  :workers 2 :poll-ms 50
                                  :retry-first-wait-ms 100 :retry-wait-factor 1 :retry-max-wait-ms 100
@@ -199,7 +199,7 @@
 
 (defn- queue-in-transaction! [pool box email keep?]
   (try
-    (cellar/run-in-transaction! pool {:read-only? false}
+    (cellar/run-in-transaction! pool {:read-only? false :log log}
                                 (fn [transaction]
                                   (let [queued (postbox/queue-email! box transaction email)]
                                     (when-not keep? (throw (ex-info "the caller's work failed" {})))
@@ -304,7 +304,7 @@
                       routes  (postbox/make-webhook-routes box webhook-settings
                                                            {:run-in-transaction (fn [f]
                                                                                   (swap! runs inc)
-                                                                                  (cellar/run-in-transaction! pool {:read-only? false} f))
+                                                                                  (cellar/run-in-transaction! pool {:read-only? false :log log} f))
                                                             :on-delivery-event {:orders/confirmation (fn [event {:keys [transaction]}]
                                                                                                        (is (some? transaction))
                                                                                                        (swap! events conj event))
