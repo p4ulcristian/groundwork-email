@@ -25,9 +25,9 @@ namespace, `postbox.api`.
 
 | name | does |
 |---|---|
-| `make-postbox` `settings-shape` | a postbox from its settings and `{:log :meter :wire}`, every key required, checked first; declares postbox's metrics |
+| `make-postbox` `settings-shape` | a postbox from its settings and `{:log :meter :wire :system-actor}`, every key required, checked first; declares postbox's metrics |
 | `emails-table` | `postbox.emails` as a map for cellar, to migrate with the app's tables |
-| `make-background-job-kind` | the kind that sends, `:postbox/send-email`, for backroom's workers |
+| `make-background-job-kind` | the kind that sends, `:postbox/send-email`, for backroom's workers, run as the options' `:system-actor` |
 | `queue-email!` `email-shape` | queues a written email in the caller's transaction; `:queued`, or `:queued-before` for a key queued before |
 | `find-email` | an email's row: key, tag, state, message id, queued and sent at |
 | `make-webhook-routes` `webhook-settings-shape` | the delivery and inbound webhooks, as reitit data |
@@ -44,7 +44,8 @@ namespace, `postbox.api`.
                          ;; or, sending nothing: {:name :log :level :info}
                          :tags           #{:orders/confirmation :orders/shop-notification}
                          :background-job {:timeout-ms 60000 :attempts 8}}
-                        {:log log :meter meter :wire wire}))
+                        {:log log :meter meter :wire wire
+                         :system-actor :postbox}))   ; whom the sending job runs as (backroom's kind :system-actor)
 
 (cellar/migrate! pool (into app-tables (conj backroom/background-jobs-tables postbox/emails-table)) changes migrate-options)
 (backroom/start-workers! pool (assoc backroom-settings :kinds [(postbox/make-background-job-kind postbox)] …))

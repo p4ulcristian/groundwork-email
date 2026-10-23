@@ -51,11 +51,16 @@
                      [:attempts [:int {:min 1}]]]]])
 
 (def options-shape
-  "make-postbox's options: the app's log, meter and wire."
+  "make-postbox's options: the app's log, meter and wire, and
+   :system-actor, the named system actor the sending background job runs
+   as (its kind's :system-actor, backroom's; a keyword without a
+   namespace): the app's to name, as it says whom its webhooks run as
+   (groundwork's is doorman's :postbox, for both)."
   [:map {:closed true}
    [:log [fn? {:error/message "should be the app's log function, made by logbook"}]]
    [:meter [some? {:error/message "should be the app's meter, made by meter.api/make-meter"}]]
-   [:wire [some? {:error/message "should be the app's wire, made by wire.api/make-wire-from-settings"}]]])
+   [:wire [some? {:error/message "should be the app's wire, made by wire.api/make-wire-from-settings"}]]
+   [:system-actor [simple-keyword? {:error/message "should be a keyword without a namespace, the named system actor the sending runs as"}]]])
 
 (defn- has-html-or-text? [{:keys [html text]}]
   (or (some? html) (some? text)))

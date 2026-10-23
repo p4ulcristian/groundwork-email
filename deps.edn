@@ -6,7 +6,8 @@
 
  :deps
  {;; the sending: a background job, queued in the caller's transaction
-  io.github.p4ulcristian/backroom {:git/tag "v0.5.5" :git/sha "68c8fe5"}
+  ;; on its tidy-up branch, not released: a job kind names its system actor
+  io.github.p4ulcristian/backroom {:git/sha "6b720e720a8d65390e4bd5026c419d14baf62110"}
   ;; the emails table, a map for cellar, and its queries
   io.github.p4ulcristian/cellar   {:git/tag "v0.4.5" :git/sha "801ca83"}
   ;; an email kept in its background job, Postmark's JSON and the webhooks', by the app's wire

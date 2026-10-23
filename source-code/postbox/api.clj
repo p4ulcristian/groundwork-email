@@ -117,14 +117,15 @@
 
 (defn make-postbox
   "A postbox from its settings and options ({:log :meter :wire}, the
-   app's), every key required, checked first (:postbox/bad-settings,
+   app's, and :system-actor, whom the sending job runs as), every key
+   required, checked first (:postbox/bad-settings,
    :postbox/bad-options); declares postbox's metrics on the meter, the
    settings' :tags as their set. Returns the postbox, for every other
    function."
   [postbox-settings options]
   (settings/check-data-for-shape "The settings" :postbox/bad-settings settings/settings-shape postbox-settings)
   (settings/check-data-for-shape "The options" :postbox/bad-options settings/options-shape options)
-  (let [{:keys [log meter wire]} options]
+  (let [{:keys [log meter wire system-actor]} options]
     ;; a log logbook didn't make is refused now, not at the first send
     (logbook/with-context log {})
     (metrics/declare-metrics! meter (:tags postbox-settings))
@@ -132,7 +133,8 @@
      :send-function (providers/make-send-function (:provider postbox-settings))
      :log           log
      :meter         meter
-     :wire          wire}))
+     :wire          wire
+     :system-actor  system-actor}))
 
 ;; -----------------------------------------------------------------------------
 ;; Queueing and sending
@@ -186,10 +188,12 @@
 
 (defn make-background-job-kind
   "The background job kind that sends an email, :postbox/send-email, its
-   time limit and attempts the settings' :background-job: for backroom's
-   start-workers! :kinds, with the app's own."
-  [{:keys [settings] :as postbox}]
+   time limit and attempts the settings' :background-job, run as the
+   options' :system-actor: for backroom's start-workers! :kinds, with the
+   app's own."
+  [{:keys [settings system-actor] :as postbox}]
   {:name         background-job-kind-name
+   :system-actor system-actor
    :params-shape params-shape
    :run          (fn [context params] (send-email-of-job! postbox context params))
    :timeout-ms   (get-in settings [:background-job :timeout-ms])

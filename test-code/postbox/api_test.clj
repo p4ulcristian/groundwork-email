@@ -86,9 +86,14 @@
 (deftest settings-and-emails-are-every-key-written-out
   (is (= {:background-job ["missing required key"] :provider {:level ["missing required key"]}}
          (:errors (ex-data (try (postbox/make-postbox {:provider {:name :log} :tags tags}
-                                                      {:log log :meter (make-meter) :wire wire})
+                                                      {:log log :meter (make-meter) :wire wire :system-actor :postbox})
                                 (catch Exception e e))))))
-  (let [box (postbox/make-postbox (make-settings log-provider) {:log log :meter (make-meter) :wire wire})]
+  (let [box (postbox/make-postbox (make-settings log-provider) {:log log :meter (make-meter) :wire wire :system-actor :postbox})]
+    (is (= {:system-actor ["missing required key"]}
+           (:errors (ex-data (try (postbox/make-postbox (make-settings log-provider) {:log log :meter (make-meter) :wire wire})
+                                  (catch Exception e e)))))
+        "the app names whom the sending runs as")
+    (is (= :postbox (:system-actor (postbox/make-background-job-kind box))) "the kind runs as it")
     (is (= {:reply-to ["missing required key"]}
            (:errors (ex-data (try (postbox/queue-email! box nil (dissoc (make-email 7) :reply-to))
                                   (catch Exception e e))))))
@@ -112,13 +117,13 @@
 
 (deftest the-tokens-are-secrets
   (let [refusal (fn [f] (try (f) :nothing (catch clojure.lang.ExceptionInfo e (select-keys (ex-data e) [:type :errors]))))
-        box     (postbox/make-postbox (make-settings log-provider) {:log log :meter (make-meter) :wire wire})
+        box     (postbox/make-postbox (make-settings log-provider) {:log log :meter (make-meter) :wire wire :system-actor :postbox})
         options {:run-in-transaction (fn [_] (throw (ex-info "not reached" {}))) :on-delivery-event {} :on-inbound-email {}}]
     (testing "Postmark's server token written out as text is refused, and the text is never said"
       (let [refused (refusal #(postbox/make-postbox (make-settings {:name :postmark :server-token "written-out-server-token"
                                                                     :api-url "https://api.postmarkapp.com"
                                                                     :connect-timeout-ms 2000 :request-timeout-ms 5000})
-                                                    {:log log :meter (make-meter) :wire wire}))]
+                                                    {:log log :meter (make-meter) :wire wire :system-actor :postbox}))]
         (is (= {:type :postbox/bad-settings :errors {:provider {:server-token ["should be a #secret, read from the settings' secrets source"]}}}
                refused))
         (is (not (str/includes? (pr-str refused) "written-out-server-token")))))
@@ -134,7 +139,7 @@
 
 (deftest the-webhooks-refuse-without-their-token
   (let [m      (make-meter)
-        box    (postbox/make-postbox (make-settings log-provider) {:log log :meter m :wire wire})
+        box    (postbox/make-postbox (make-settings log-provider) {:log log :meter m :wire wire :system-actor :postbox})
         called (atom 0)
         routes (postbox/make-webhook-routes box webhook-settings
                                             {:run-in-transaction (fn [_] (throw (ex-info "not reached" {})))
@@ -176,6 +181,8 @@
 
 (defn- start-workers! [pool box m]
   (backroom/start-workers! pool {:wire wire :log log :meter m
+                                 ;; as an app opens the job's transaction (doorman's run-as-system!, in groundwork)
+                                 :run-in-transaction-as (fn [pool _system-actor f] (cellar/run-in-transaction! pool {:read-only? false} f))
                                  :kinds [(postbox/make-background-job-kind box)] :schedules []
                                  :workers 2 :poll-ms 50
                                  :retry-first-wait-ms 100 :retry-wait-factor 1 :retry-max-wait-ms 100
@@ -233,7 +240,7 @@
 
         (testing "the :log provider: rolled back, nothing is sent; committed, sent once; its key never again"
           (let [m       (make-meter)
-                box     (postbox/make-postbox (make-settings log-provider) {:log log :meter m :wire wire})
+                box     (postbox/make-postbox (make-settings log-provider) {:log log :meter m :wire wire :system-actor :postbox})
                 workers (start-workers! pool box m)]
             (try
               (reset! lines [])
@@ -263,7 +270,7 @@
                                [200 "{\"ErrorCode\":0,\"Message\":\"OK\",\"MessageID\":\"pm-3\",\"To\":\"anna@shop.example\"}"]])
                 fake    (start-fake-postmark! answers)
                 m       (make-meter)
-                box     (postbox/make-postbox (make-settings (postmark-provider (:url fake))) {:log log :meter m :wire wire})
+                box     (postbox/make-postbox (make-settings (postmark-provider (:url fake))) {:log log :meter m :wire wire :system-actor :postbox})
                 workers (start-workers! pool box m)]
             (try
               (is (= :queued (queue-in-transaction! pool box (make-email 3) true)))
