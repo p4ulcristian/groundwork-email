@@ -174,7 +174,7 @@
 
 (defn- make-tables-afresh! [pool]
   (cellar/run-statement! pool (cellar/make-query-from-sql-text "drop" "DROP SCHEMA IF EXISTS postbox CASCADE; DROP SCHEMA IF EXISTS backroom CASCADE; DROP SCHEMA IF EXISTS cellar CASCADE") {})
-  @(:slow-part (cellar/migrate! pool (conj backroom/background-jobs-tables postbox/emails-table) []
+  @(:slow-part (cellar/migrate! pool {:tables (conj backroom/background-jobs-tables postbox/emails-table) :extensions [] :functions [] :views []} []
                                 {:instant-part {:statement-timeout-ms 5000 :lock-timeout-ms 5000}
                                  :slow-part    {:statement-timeout-ms :none :lock-timeout-ms 5000}
                                  :log          (fn [_ _ _])})))

@@ -88,7 +88,10 @@
                [:email/message-id :string                   {:optional? true}]
                [:email/queued-at  :time/instant             {:default :now}]
                [:email/sent-at    :time/instant             {:optional? true}]]
-   :indexes   [[:email/message-id]]
+   :indexes   [{:columns [[:email/message-id :ascending :nulls-last]]
+                :method :btree :ops {} :unique? false :where nil}]
+   :uniques   []
+   :checks    []
    :references []
    :triggers   []
    :gates     nil

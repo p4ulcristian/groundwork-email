@@ -47,7 +47,9 @@ namespace, `postbox.api`.
                         {:log log :meter meter :wire wire
                          :system-actor :postbox}))   ; whom the sending job runs as (backroom's kind :system-actor)
 
-(cellar/migrate! pool (into app-tables (conj backroom/background-jobs-tables postbox/emails-table)) changes migrate-options)
+(cellar/migrate! pool {:tables     (into app-tables (conj backroom/background-jobs-tables postbox/emails-table))
+                       :extensions [] :functions [] :views []}
+                 changes migrate-options)
 (backroom/start-workers! pool (assoc backroom-settings :kinds [(postbox/make-background-job-kind postbox)] …))
 
 ;; in the transaction that marks the order paid
