@@ -8,21 +8,21 @@
  {;; the sending: a background job, queued in the caller's transaction
   ;; on its tidy-up branch, not released: a job kind names its system actor; its tables
   ;; in groundwork-postgres's tidy-up shapes; a job's transaction carries its log
-  io.github.p4ulcristian/groundwork-background-jobs {:git/tag "v0.5.8" :git/sha "8fea850"}
+  io.github.p4ulcristian/groundwork-background-jobs {:git/tag "v0.5.9" :git/sha "7b486dc"}
   ;; the emails table, a map for groundwork-postgres, and its queries
   ;; on its tidy-up branch, not released: a table map writes out :uniques and :checks,
   ;; a reference what it does on delete, update and when checked, an index as a map;
   ;; migrate! takes {:tables :extensions :functions :views}; run-in-transaction! takes the
   ;; caller's :log
-  io.github.p4ulcristian/groundwork-postgres   {:git/tag "v0.4.8" :git/sha "322b4b1"}
+  io.github.p4ulcristian/groundwork-postgres   {:git/tag "v0.4.9" :git/sha "1cc359d"}
   ;; an email kept in its background job, Postmark's JSON and the webhooks', by the app's shaper
   io.github.p4ulcristian/groundwork-shaped-json     {:git/tag "v0.2.2" :git/sha "1c0fcf9"}
   ;; the app's log, handed in
   io.github.p4ulcristian/groundwork-logs  {:git/tag "v0.1.3" :git/sha "8d1846e"}
   ;; the app's meter, handed in: emails queued, sent and failed by tag, webhook events
-  io.github.p4ulcristian/groundwork-metrics    {:git/tag "v0.1.6" :git/sha "88ae7a3"}
+  io.github.p4ulcristian/groundwork-metrics    {:git/tag "v0.1.7" :git/sha "53c7099"}
   ;; Postmark's server token and the webhooks' token, secrets that print as their names
-  io.github.p4ulcristian/groundwork-settings     {:git/tag "v0.1.3" :git/sha "d277ab0"}
+  io.github.p4ulcristian/groundwork-settings     {:git/tag "v0.1.4" :git/sha "f235cc4"}
   ;; the settings, options and emails, checked before anything is queued
   metosin/malli                  {:mvn/version "0.20.3"}}
 
