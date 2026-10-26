@@ -183,6 +183,7 @@
   (background-jobs/start-workers! pool {:shaper shaper :log log :meter m
                                  ;; as an app opens the job's transaction (groundwork-access's run-as-system!, in groundwork)
                                  :run-in-transaction-as (fn [pool _system-actor log f] (postgres/run-in-transaction! pool {:read-only? false :log log} f))
+                                 :given-to-every-run {}
                                  :kinds [(email/make-background-job-kind box)] :schedules []
                                  :workers 2 :poll-ms 50
                                  :retry-first-wait-ms 100 :retry-wait-factor 1 :retry-max-wait-ms 100
