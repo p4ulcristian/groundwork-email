@@ -27,18 +27,19 @@
       :metadata    {\"order-id\" \"7\"}}        ; as the email was queued with
 
    Any other record (a delivery, an open, a click) is ignored. An inbound
-   email, handed to the function of its mailbox:
+   email, every one handed to the app's one inbound function, which routes
+   it by its :mailbox:
 
      {:message-id  \"…\"
       :mailbox     \"quotes\"                 ; before @ of the recipient on :inbound-domain, lower case;
-                                            ; else Postmark's MailboxHash (inbound+quotes@…)
+                                            ; else Postmark's MailboxHash (inbound+quotes@…); else nil
       :from        {:address \"bob@example.com\" :name \"Bob\"}
       :to          [\"quotes@in.shop.example\"]
       :subject     \"…\" :text \"…\" :html \"…\" :stripped-reply \"…\"   ; each nil when missing
       :attachments [{:name \"door.jpg\" :content-type \"image/jpeg\" :bytes bytes}]}
 
-   One with no mailbox on the domain, or a mailbox with no function, is
-   written to the log at :info. Each function runs in one transaction the
+   A delivery event of a tag with no function is written to the log at
+   :info. Each function runs in one transaction the
    app's :run-in-transaction makes (the app says as whom: groundwork's runs
    it as groundwork-access's system actor :email, which the gates allow what the
    app's sentences give it), as (f event {:transaction transaction :log
@@ -168,13 +169,10 @@
             :no-function)))
     :ignored))
 
-(defn- answer-inbound-email [{:keys [inbound-domain on-inbound-email log] :as webhooks} payload]
+(defn- answer-inbound-email [{:keys [inbound-domain on-inbound-email] :as webhooks} payload]
   (let [email (normalize-inbound-email inbound-domain payload)
         what  {:groundwork-email/mailbox (:mailbox email) :groundwork-email/message-id (:message-id email)}]
-    (if-let [f (get on-inbound-email (:mailbox email))]
-      (run-function! webhooks f (fn [_ email] email) email :inbound what)
-      (do (log :info :groundwork-email/no-function what)
-          :no-function))))
+    (run-function! webhooks on-inbound-email (fn [_ email] email) email :inbound what)))
 
 (defn make-webhook-routes
   "The two routes as reitit data (see the namespace)."

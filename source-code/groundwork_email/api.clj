@@ -23,18 +23,22 @@
                             :text        text
                             :metadata    {\"order-id\" (str order-id)}
                             :attachments []
-                            :stream      \"outbound\"})
+                            :stream      \"outbound\"
+                            :unsubscribe-url nil})   ; or \"https://…\": RFC 8058's two headers
      ;=> :queued   (:queued-before when its key was queued before: nothing queued)
 
    An email is a row of groundwork_email.emails (emails-table, a map for groundwork-postgres):
-   its key, tag, state (queued, sent), the provider's message id, when it
-   was queued and sent; never its addresses or bodies. Its content waits in
-   its background job (groundwork_background_jobs.background_jobs), queued in the same
+   its key, tag, state (queued, sent, gave-up), the provider's message id,
+   why it gave up, when it was queued and sent; never its addresses or
+   bodies. Its content waits in its background job
+   (groundwork_background_jobs.background_jobs), queued in the same
    transaction; the job, run by groundwork-background-jobs, holds the row (FOR UPDATE),
-   sends it unless it is sent already, and marks it sent with the
-   provider's message id, in its one transaction. A failure runs again
+   sends it unless it is sent or gave up already, and marks it sent with
+   the provider's message id, in its one transaction. A failure runs again
    later (groundwork-background-jobs's retries); an email the provider refuses for itself
-   (Postmark: an invalid email, an inactive recipient) gives up at once.
+   (Postmark: an invalid email, an inactive recipient) gives up at once:
+   marked gave-up with the reason in the same transaction, which then
+   commits, its job done.
 
    The provider (the settings' :provider): :postmark, its HTTP API; :log,
    the email written to the app's log, answered as sent.
@@ -58,6 +62,7 @@
 (def ^:private insert-email (make-query "insert_email.sql"))
 (def ^:private lock-email (make-query "lock_email.sql"))
 (def ^:private update-email-to-sent (make-query "update_email_to_sent.sql"))
+(def ^:private update-email-to-gave-up (make-query "update_email_to_gave_up.sql"))
 (def ^:private find-email-row (make-query "find_email.sql"))
 (def ^:private find-email-of-message (make-query "find_email_of_message.sql"))
 
@@ -80,18 +85,22 @@
 
 (def emails-table
   "Every email queued: groundwork_email.emails, a map for groundwork-postgres, to pass with the
-   app's tables. Its key is the email's own: a key is queued once, ever."
+   app's tables. Its key is the email's own: a key is queued once, ever.
+   Its state is queued, sent, or gave-up (the provider refused the email
+   itself), and a gave-up one, only it, has its reason: Postmark's name of
+   its error code and the code, \"Inactive recipient (406)\"."
   {:table     :groundwork-email/emails
-   :columns   [[:email/key        :string                   {:primary-key? true}]
-               [:email/tag        :string]
-               [:email/state      [:enum "queued" "sent"]   {:default "queued"}]
-               [:email/message-id :string                   {:optional? true}]
-               [:email/queued-at  :time/instant             {:default :now}]
-               [:email/sent-at    :time/instant             {:optional? true}]]
+   :columns   [[:email/key            :string                             {:primary-key? true}]
+               [:email/tag            :string]
+               [:email/state          [:enum "queued" "sent" "gave-up"]   {:default "queued"}]
+               [:email/message-id     :string                             {:optional? true}]
+               [:email/gave-up-reason :string                             {:optional? true}]
+               [:email/queued-at      :time/instant                       {:default :now}]
+               [:email/sent-at        :time/instant                       {:optional? true}]]
    :indexes   [{:columns [[:email/message-id :ascending :nulls-last]]
                 :method :btree :ops {} :unique? false :where nil}]
    :uniques   []
-   :checks    []
+   :checks    ["(email__state = 'gave-up') = (email__gave_up_reason IS NOT NULL)"]
    :references []
    :triggers   []
    :gates     nil
@@ -101,7 +110,9 @@
 
 (def ^:private params-shape
   "The email as its background job keeps it: the tag as text, the
-   metadata as name-value pairs, the attachments' bytes as base64."
+   metadata as name-value pairs, the attachments' bytes as base64. The
+   unsubscribe address is optional here, and only here: a job queued by
+   v0.1 has none, and is sent without the headers."
   [:map {:closed true}
    [:email/key :string]
    [:email/tag :string]
@@ -113,7 +124,8 @@
    [:email/text [:maybe :string]]
    [:email/metadata [:vector [:map {:closed true} [:name :string] [:value :string]]]]
    [:email/attachments [:vector [:map {:closed true} [:name :string] [:content-type :string] [:content-base64 :string]]]]
-   [:email/stream :string]])
+   [:email/stream :string]
+   [:email/unsubscribe-url {:optional true} [:maybe :string]]])
 
 ;; -----------------------------------------------------------------------------
 ;; The mailer
@@ -145,7 +157,7 @@
 (defn- encode-base64 [^bytes bs]
   (.encodeToString (Base64/getEncoder) bs))
 
-(defn- turn-email-into-params [{:keys [key tag to from reply-to subject html text metadata attachments stream]}]
+(defn- turn-email-into-params [{:keys [key tag to from reply-to subject html text metadata attachments stream unsubscribe-url]}]
   {:email/key         key
    :email/tag         (subs (str tag) 1)
    :email/to          to
@@ -158,19 +170,25 @@
    :email/attachments (mapv (fn [{:keys [name content-type bytes]}]
                               {:name name :content-type content-type :content-base64 (encode-base64 bytes)})
                             attachments)
-   :email/stream      stream})
+   :email/stream      stream
+   :email/unsubscribe-url unsubscribe-url})
 
 (defn- find-tag [tags tag-text]
   (some #(when (= tag-text (subs (str %) 1)) %) tags))
 
 (defn- turn-params-into-email [tags params]
-  (let [{:email/keys [key tag to from reply-to subject html text metadata attachments stream]} params]
+  (let [{:email/keys [key tag to from reply-to subject html text metadata attachments stream unsubscribe-url]} params]
     {:key key :tag (find-tag tags tag) :to to :from from :reply-to reply-to :subject subject :html html :text text
-     :metadata (into {} (map (juxt :name :value)) metadata) :attachments attachments :stream stream}))
+     :metadata (into {} (map (juxt :name :value)) metadata) :attachments attachments :stream stream
+     :unsubscribe-url unsubscribe-url}))
 
 (defn- send-email-of-job!
   "The background job's run: holds the email's row, sends it unless it is
-   sent, marks it sent."
+   sent or gave up, marks it sent, or gave-up with the reason when the
+   provider refuses the email itself. A give-up is an answer, not a throw:
+   the job's transaction commits the row's gave-up with the job's done; a
+   throw would roll the row back, and groundwork-background-jobs marks a
+   job failed on the pool, outside it."
   [{:keys [settings send-function meter shaper]} {:keys [transaction log]} params]
   (let [{:keys [key tag] :as email} (turn-params-into-email (:tags settings) params)
         row (postgres/find-one-row transaction lock-email {:email/key key})]
@@ -181,13 +199,23 @@
       (= "sent" (:email/state row))
       (log :info :groundwork-email/sent-before {:email/key key :email/message-id (:email/message-id row)})
 
+      (= "gave-up" (:email/state row))
+      (log :info :groundwork-email/gave-up-before {:email/key key :email/gave-up-reason (:email/gave-up-reason row)})
+
       :else
-      (let [{:keys [message-id]} (try (send-function email {:log log :shaper shaper})
-                                      (catch Exception e
-                                        (metrics/count-failed! meter tag)
-                                        (throw e)))]
-        (postgres/run-statement! transaction update-email-to-sent {:email/key key :email/message-id message-id})
-        (metrics/count-sent! meter tag)))))
+      (let [{:keys [message-id gave-up-reason provider-message]}
+            (try (send-function email {:log log :shaper shaper})
+                 (catch Exception e
+                   (metrics/count-failed! meter tag)
+                   (throw e)))]
+        (if gave-up-reason
+          (do (postgres/run-statement! transaction update-email-to-gave-up {:email/key key :email/gave-up-reason gave-up-reason})
+              (metrics/count-failed! meter tag)
+              (metrics/count-gave-up! meter tag)
+              (log :error :groundwork-email/gave-up {:email/key key :email/tag tag :email/gave-up-reason gave-up-reason
+                                                     :groundwork-email/provider-message provider-message}))
+          (do (postgres/run-statement! transaction update-email-to-sent {:email/key key :email/message-id message-id})
+              (metrics/count-sent! meter tag)))))))
 
 (defn make-background-job-kind
   "The background job kind that sends an email, :groundwork-email/send-email, its
@@ -226,8 +254,10 @@
           :queued))))
 
 (defn find-email
-  "The email's row, #:email{:key :tag :state :message-id :queued-at
-   :sent-at}, or nil."
+  "The email's row, #:email{:key :tag :state :message-id :gave-up-reason
+   :queued-at :sent-at}, or nil. :state is \"queued\", \"sent\" or
+   \"gave-up\"; :gave-up-reason is nil but for a gave-up one. An app reads
+   its emails' states by their keys, keeping no copy."
   [pool-or-transaction email-key]
   (postgres/find-one-row pool-or-transaction find-email-row {:email/key email-key}))
 
@@ -241,10 +271,11 @@
    of groundwork-settings's of at least 16 characters, :inbound-domain) and options
    (:run-in-transaction, (fn [f]) running (f transaction) in one
    transaction of the app's, as whom it chooses (groundwork's: groundwork-access's
-   system actor :email); :on-delivery-event {tag f}; :on-inbound-email
-   {mailbox f}; f is (fn [event {:keys [transaction log]}]), safe to run
-   twice), every key required, checked first; a tag that isn't one of the
-   settings' :tags is refused."
+   system actor :email); :on-delivery-event {tag f}; :on-inbound-email f,
+   the one function every inbound email goes to, routing by its :mailbox;
+   f is (fn [event {:keys [transaction log]}]), safe to run twice), every
+   key required, checked first; a tag that isn't one of the settings'
+   :tags is refused."
   [{:keys [settings log meter shaper]} webhook-settings options]
   (settings/check-data-for-shape "The settings" :groundwork-email/bad-settings settings/webhook-settings-shape webhook-settings)
   (settings/check-token-length (:token webhook-settings))

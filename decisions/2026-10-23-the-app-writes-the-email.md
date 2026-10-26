@@ -1,5 +1,7 @@
 # The app writes the email; postbox takes it whole
 
+> **Changed in part** by [An email has an unsubscribe URL](2026-10-26-an-email-has-an-unsubscribe-url.md) (2026-10-26, v0.2.0): one more key, `:unsubscribe-url`, an `https://` address or nil, sent as RFC 8058's two headers.
+
 **Decision:** the app renders (its templates, its language) and hands postbox a written email, every key required, nil or empty where it has none (`email-shape`):
 
 | key | | |

@@ -4,6 +4,8 @@
 
 > **Changed in part** by [The family and its composer are groundwork](https://github.com/p4ulcristian/groundwork/blob/Starting-from-the-bottom/decisions/2026-10-23-the-family-and-its-composer-are-groundwork.md) (2026-10-23): manor, the family, and house, the composer, are both named groundwork now.
 
+> **Changed in part** by [Inbound mail goes to one function of the app](2026-10-26-inbound-mail-goes-to-one-function-of-the-app.md) (2026-10-26, v0.2.0): every inbound email goes to one function, `:on-inbound-email (fn [email context])`, which routes by its `:mailbox`; no map of mailboxes, no `no-function` for an inbound email.
+
 **Decision:** `make-webhook-routes` makes two POST routes as reitit data, at the settings' `:delivery-path` and `:inbound-path`; the provider's webhook URL carries `?token=<the settings' :token>`.
 
 - **The token** is compared in constant time (both sides hashed, then `MessageDigest/isEqual`); none or another is 401, written at `:warn`, the body never read. A body that isn't a JSON object is 400.

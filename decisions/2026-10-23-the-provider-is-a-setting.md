@@ -1,5 +1,7 @@
 # The provider is a setting: Postmark or the log
 
+> **Changed in part** by [A send that gives up has its own state](2026-10-26-a-send-that-gives-up-has-its-own-state.md) (2026-10-26, v0.2.0): a 422 of 300 or 406 is no longer groundwork-background-jobs's give-up; the provider answers it, and the job marks the row `gave-up` with the reason, committed with the job done.
+
 **Decision:** the settings' `:provider` names who sends, each with its own keys, every one required:
 
 - `{:name :postmark :server-token … :api-url "https://api.postmarkapp.com" :connect-timeout-ms … :request-timeout-ms …}`: Postmark's HTTP API, a POST to `<api-url>/email` with the server token, through one java.net.http client made with the postbox. An answer of 200 with `ErrorCode` 0 is sent. 422 with `ErrorCode` 300 (an invalid email: a bad address, no body) or 406 (an inactive recipient: bounced or complained before) gives up at once, backroom's give-up: no attempt changes the email. Anything else (a 5xx, a 429, a 401 from a wrong token, no connection, a timeout) throws, and runs again by backroom's retries; a wrong token fixed in time loses nothing.

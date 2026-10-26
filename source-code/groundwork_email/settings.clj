@@ -62,6 +62,10 @@
    [:shaper [some? {:error/message "should be the app's shaper, made by groundwork-shaped-json.api/make-shaper-from-settings"}]]
    [:system-actor [simple-keyword? {:error/message "should be a keyword without a namespace, the named system actor the sending runs as"}]]])
 
+(def ^:private unsubscribe-url-shape
+  [:re {:error/message "should be an https:// address without spaces, commas, quotes or angle brackets, or nil"}
+   #"^https://[^\s<>,\"]+$"])
+
 (defn- has-html-or-text? [{:keys [html text]}]
   (or (some? html) (some? text)))
 
@@ -76,7 +80,13 @@
    :metadata: text to text, back on the email's bounces: at most 10, a
    name at most 20 characters, a value at most 80 (Postmark's limits).
    :attachments: [{:name \"invoice.pdf\" :content-type \"application/pdf\" :bytes bytes}], [] for none.
-   :stream: the provider's message stream, \"outbound\" or \"broadcast\"."
+   :stream: the provider's message stream, \"outbound\" or \"broadcast\".
+   :unsubscribe-url: where a reader stops this kind of email, an https://
+   address, or nil for none. With one, the email carries RFC 8058's two
+   headers, List-Unsubscribe: <url> and List-Unsubscribe-Post:
+   List-Unsubscribe=One-Click: a mail program shows an unsubscribe button
+   that posts List-Unsubscribe=One-Click to the address. No other header
+   can be set."
   [:and
    [:map {:closed true}
     [:key [:string {:min 1 :max 300}]]
@@ -92,7 +102,8 @@
                             [:name [:string {:min 1}]]
                             [:content-type [:string {:min 1}]]
                             [:bytes bytes?]]]]
-    [:stream [:string {:min 1}]]]
+    [:stream [:string {:min 1}]]
+    [:unsubscribe-url [:maybe unsubscribe-url-shape]]]
    [:fn {:error/message "should have :html or :text, or both"} has-html-or-text?]])
 
 (def webhook-settings-shape
@@ -121,14 +132,16 @@
    groundwork-access's system actor :email).
    :on-delivery-event: {tag (fn [event context])}, a bounce or spam
    complaint handed to the function of the email's tag; {} for none.
-   :on-inbound-email: {mailbox (fn [email context])}, an inbound email
-   handed to the function of its mailbox (\"quotes\"); {} for none.
+   :on-inbound-email: (fn [email context]), the one function every
+   inbound email is handed to; the email's :mailbox (the part before @ of
+   its recipient on :inbound-domain, lower case, or nil) is for it to
+   route by. An app that takes no inbound email hands one that ignores it.
    context is {:transaction :log}. A function must be safe to run twice:
    the provider may post an event again."
   [:map {:closed true}
    [:run-in-transaction fn?]
    [:on-delivery-event [:map-of :qualified-keyword fn?]]
-   [:on-inbound-email [:map-of [:string {:min 1}] fn?]]])
+   [:on-inbound-email [fn? {:error/message "should be the one function every inbound email is handed to, (fn [email context])"}]]])
 
 (def ^:private shortest-token-length 16)
 
