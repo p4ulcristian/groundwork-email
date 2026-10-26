@@ -2,5 +2,5 @@
 -- the same job waits, then sees it sent.
 SELECT email__key, email__tag, email__state, email__message_id
 FROM groundwork_email.emails
-WHERE email__key = :email/key
+WHERE email__key = param('email/key')
 FOR UPDATE
