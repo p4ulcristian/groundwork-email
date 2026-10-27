@@ -11,7 +11,7 @@ webhooks and are handed to the app's functions: a bounce by the email's
 tag, every inbound email to one function, which routes by the mailbox.
 
 ```clojure
-io.github.p4ulcristian/groundwork-email {:git/tag "v0.2.1" :git/sha "e9cf94b"}
+io.github.p4ulcristian/groundwork-email {:git/tag "v0.2.2" :git/sha "b312a48"}
 ```
 
 Needs [groundwork-background-jobs](https://github.com/p4ulcristian/groundwork-background-jobs),
