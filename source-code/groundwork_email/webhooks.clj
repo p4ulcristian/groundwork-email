@@ -53,14 +53,32 @@
    (java.nio.charset StandardCharsets)
    (java.util Base64)))
 
-(defn- read-token [{:keys [query-string]}]
-  (some-> (when query-string (re-find #"(?:^|&)token=([^&]*)" query-string))
-          second
-          (URLDecoder/decode StandardCharsets/UTF_8)))
+(defn- read-query-pair
+  "[name value] of one name=value of a query string, each decoded by the
+   JDK's URLDecoder as UTF-8 form text (%2B a +, + a space); a name without
+   = has the value \"\"; nil for one with a bad %-escape."
+  [pair]
+  (let [at (str/index-of pair "=")]
+    (try
+      [(URLDecoder/decode ^String (if at (subs pair 0 at) pair) StandardCharsets/UTF_8)
+       (URLDecoder/decode ^String (if at (subs pair (inc at)) "") StandardCharsets/UTF_8)]
+      (catch IllegalArgumentException _ nil))))
+
+(defn- read-token
+  "The request's ?token=, decoded; nil when the query has none, or has it
+   twice (two tokens are no token: which one would be meant?). A pair with
+   a bad %-escape is left out."
+  [{:keys [query-string]}]
+  (let [tokens (for [pair (str/split (or query-string "") #"&")
+                     :let [[k v] (read-query-pair pair)]
+                     :when (= "token" k)]
+                 v)]
+    (when (= 1 (count tokens)) (first tokens))))
 
 (defn has-token?
   "Whether the request's ?token= is the token (a secret), compared in
-   constant time by groundwork-settings."
+   constant time by groundwork-settings; the query read as form text by
+   the JDK's URLDecoder, a token given twice none."
   [request token]
   (settings/equal? token (read-token request)))
 

@@ -1,5 +1,7 @@
 # Secrets are safe's wrapped secrets
 
+> **Changed in part** by [The webhooks' token is read from the query as form text, by the JDK](2026-10-27-the-webhooks-token-is-read-from-the-query-as-form-text.md) (2026-10-27, v0.2.1): the request's `?token=` is read by URLDecoder, a bad escape left out, a token given twice none.
+
 > Changes in part [The provider is a setting](2026-10-23-the-provider-is-a-setting.md) (Postmark's `:server-token` is `safe/secret`) and [The webhooks hand events to the app's functions](2026-10-23-webhooks-hand-events-to-the-apps-functions.md) (the webhooks' `:token` is `safe/secret`, compared by `safe/equal?`). Since v0.1.1, on [safe](https://github.com/p4ulcristian/safe) v0.1.0.
 
 **Decision:** postbox's two tokens are secrets of safe's:

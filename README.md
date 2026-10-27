@@ -115,7 +115,9 @@ header can be set
 
 The two tokens are groundwork-settings's secrets: written out as text, they are refused,
 and each is revealed only where it is used, Postmark's in its header, the
-webhooks' once for its length. The webhooks: the token is compared in
+webhooks' once for its length. The webhooks: the token, `?token=` read as
+form text by the JDK's URLDecoder (given twice, none;
+[why](decisions/2026-10-27-the-webhooks-token-is-read-from-the-query-as-form-text.md)), is compared in
 constant time (`settings/equal?`), 401 without it; a
 body that isn't a JSON object is 400; every other post is 200, whatever the
 app's function does (one that throws is logged,

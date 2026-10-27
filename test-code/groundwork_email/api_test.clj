@@ -180,6 +180,25 @@
             "groundwork_email_webhook_events_total{outcome=\"bad-body\",webhook=\"delivery\"}" 1.0}
            (into {} (remove (comp zero? val)) (read-counters m "groundwork_email_webhook_events_total"))))))
 
+;; the token taken (the body, not an object, is then 400) or refused (401)
+(deftest the-token-is-read-from-the-query-as-form-text
+  (let [box    (email/make-mailer (make-settings log-provider) {:log log :meter (make-meter) :shaper shaper :system-actor :email})
+        routes (email/make-webhook-routes box webhook-settings
+                                            {:run-in-transaction (fn [_] (throw (ex-info "not reached" {})))
+                                             :on-delivery-event {:orders/confirmation (fn [_ _] nil)}
+                                             :on-inbound-email  (fn [_ _] nil)})
+        status #(:status (post routes "/email/delivery" % "[1,2]"))]
+    (is (= 400 (status "token=the-webhook-token-0123")))
+    (is (= 400 (status "a=1&token=the-webhook-token-0123&b")) "among other params")
+    (is (= 400 (status "token=the%2Dwebhook%2dtoken-0123")) "%-escaped")
+    (is (= 400 (status "tok%65n=the-webhook-token-0123")) "its name %-escaped too, as form text")
+    (is (= 400 (status "x=%zz&token=the-webhook-token-0123")) "a pair with a bad escape is left out, the rest read")
+    (is (= 401 (status "token=%zz")) "a token with a bad escape is none")
+    (is (= 401 (status "token=the-webhook-token-0123&token=the-webhook-token-0123")) "twice: none")
+    (is (= 401 (status "xtoken=the-webhook-token-0123")) "another name")
+    (is (= 401 (status "token")) "no value")
+    (is (= 401 (status "")) "an empty query")))
+
 ;; -----------------------------------------------------------------------------
 ;; Against Postgres
 
