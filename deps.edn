@@ -14,7 +14,7 @@
   ;; a reference what it does on delete, update and when checked, an index as a map;
   ;; migrate! takes {:tables :extensions :functions :views}; run-in-transaction! takes the
   ;; caller's :log
-  io.github.p4ulcristian/groundwork-postgres   {:git/tag "v0.5.0" :git/sha "bca8150"}
+  io.github.p4ulcristian/groundwork-postgres   {:git/tag "v0.5.2" :git/sha "6e2bbab08503abd5a73f000644bc0980c1d6e50c"}
   ;; an email kept in its background job, Postmark's JSON and the webhooks', by the app's shaper
   io.github.p4ulcristian/groundwork-shaped-json     {:git/tag "v0.2.2" :git/sha "1c0fcf9"}
   ;; the app's log, handed in
